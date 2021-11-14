@@ -1,0 +1,9 @@
+name: dartminator
+description: Dart gRPC server and client
+publish_to: none
+
+environment:
+  sdk: 2.14.4
+
+dependencies: 
+  grpc: ^3.0.2
