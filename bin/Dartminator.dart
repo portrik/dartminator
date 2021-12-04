@@ -2,7 +2,6 @@ import 'dart:io' as io;
 import 'dart:convert' show utf8;
 
 import 'package:grpc/src/server/call.dart';
-import 'package:faker/faker.dart';
 import 'package:grpc/grpc.dart';
 
 import '../lib/src/generated/google/protobuf/empty.pb.dart';
@@ -28,10 +27,9 @@ class DartminatorNode extends NodeServiceBase {
   }
 
   Future<Null> init() async {
-    await findRoot().timeout(const Duration(seconds: 5), onTimeout: () {
+    await findRoot().timeout(const Duration(seconds: 1), onTimeout: () {
       logger.i('Could not find root within the time limit. Ending the search.');
     });
-
     await listenForChildren();
   }
 
@@ -98,7 +96,7 @@ class DartminatorNode extends NodeServiceBase {
 
           if (response != null) {
             var responderName =
-                utf8.decode(response.data).split('-')[1].split('Name')[0];
+                utf8.decode(response.data).split('-')[1].split('Name')[1];
 
             logger.i(
                 'Root Search: Got response from $responderName at ${response.address}');
@@ -174,7 +172,7 @@ class DartminatorNode extends NodeServiceBase {
               // Creates the Dartminator Node stub to use for communication
               children.add(NodeClient(childChannel,
                   options: CallOptions(timeout: const Duration(seconds: 30))));
-            } else if (payload.split('Name') != name) {
+            } else if (payload.split('Name')[1] != name) {
               logger.i('Found a new potential child at ${response.address}.');
               socket.send('Dartminator-Name${name}'.codeUnits, response.address,
                   response.port);
@@ -187,28 +185,5 @@ class DartminatorNode extends NodeServiceBase {
         logger.e(stacktrace);
       }
     });
-  }
-}
-
-Future<void> main(List<String> args) async {
-  var logger = getLogger();
-  var faker = Faker();
-
-  final port = 8080;
-
-  try {
-    final node = DartminatorNode(faker.person.name(), port, 2);
-
-    final server = Server([node], const <Interceptor>[],
-        CodecRegistry(codecs: const [GzipCodec(), IdentityCodec()]));
-
-    logger.i('Starting node on port $port (gRPC listening on 50051)');
-
-    await server.serve(port: 50051);
-    node.init();
-  } catch (e, stacktrace) {
-    logger.e('The node failed terribly!');
-    logger.e(e);
-    logger.e(stacktrace);
   }
 }
