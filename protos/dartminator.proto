@@ -7,31 +7,29 @@ import "google/protobuf/empty.proto";
 // 1. The Initiator of the computation becomes the root of the tree
 //     and sends out a computational message
 // 2. Upon recieving computational message
-//    Not in the computation: Node becomes child of sender, no acknowledgment is sent
-//    In the computation: Acknowledgement is sent immediately
+//    a. Not in the computation: Node becomes child of sender, no acknowledgment is sent
+//    b. In the computation: Acknowledgement is sent immediately
 // 3. When node and all of its children become idle, acknowledgement is sent to parent
 // 4. Termination occurs when the initiator has no children and is idle
 
 // Nodes in the Dijkstra-Scholten algorithm are all equal thus having the same rpcs
+// Both server and client code is implemented in the Node
 service Node {
-    rpc InitiateComputation(ComputationalMessage) returns (Acknowledgement);
-
-    rpc SendComputationEnd(Acknowledgement) returns (google.protobuf.Empty);
+    rpc Initiate(ComputationArgument) returns (stream ComputationHeartbeat);
 }
 
-message ComputationalMessage {
-    string algorithm_name = 1;
-    google.protobuf.Any argument = 2;
+message ComputationArgument {
+    google.protobuf.Any argument = 1;
 }
 
-message ComputationFinished {
+message ComputationResult {
     bool done = 1;
     google.protobuf.Any result = 2;
 }
 
-message Acknowledgement {
-    oneof response {
-        ComputationFinished finished = 1;
-        google.protobuf.Empty nothing = 2;
+message ComputationHeartbeat {
+    oneof content {
+        ComputationResult result = 1;
+        google.protobuf.Empty empty = 2;
     }
 }

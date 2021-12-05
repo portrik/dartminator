@@ -1,14 +1,15 @@
+import 'dart:async';
 import 'dart:io' as io;
 import 'dart:convert' show utf8;
 
-import 'package:grpc/src/server/call.dart';
 import 'package:grpc/grpc.dart';
 
-import '../lib/src/generated/google/protobuf/empty.pb.dart';
-import '../lib/src/generated/dartminator.pbgrpc.dart';
-import '../lib/src/generated/dartminator.pb.dart';
+import 'package:dartminator/generated/google/protobuf/empty.pb.dart';
+import 'package:dartminator/generated/dartminator.pbgrpc.dart';
+import 'package:dartminator/generated/dartminator.pb.dart';
 
-import './Logger.dart';
+import 'constants.dart';
+import 'logger.dart';
 
 class DartminatorNode extends NodeServiceBase {
   var logger = getLogger();
@@ -18,59 +19,20 @@ class DartminatorNode extends NodeServiceBase {
   int maxChildren;
 
   NodeClient? root;
-
   List<NodeClient> children = [];
   var isComputing = false;
+
+  late StreamSubscription<io.RawSocketEvent> childrenStream;
 
   DartminatorNode(this.name, this.discoveryPort, this.maxChildren) {
     logger.i('Initialized Node "$name"');
   }
 
-  Future<Null> init() async {
-    await findRoot().timeout(const Duration(seconds: 1), onTimeout: () {
+  Future<void> init() async {
+    await findRoot().timeout(rootSearchTimeout, onTimeout: () {
       logger.i('Could not find root within the time limit. Ending the search.');
     });
     await listenForChildren();
-  }
-
-  @override
-  Future<Empty> sendComputationEnd(
-      ServiceCall call, Acknowledgement request) async {
-    // TODO: Remove child from the list
-    logger.i('Received computation end message.');
-    logger.i(call);
-    logger.i(request);
-
-    return new Empty();
-  }
-
-  @override
-  Future<Acknowledgement> initiateComputation(
-      ServiceCall call, ComputationalMessage request) async {
-    this.logger.i('Received message of computation initiation.');
-
-    var ack = Acknowledgement();
-
-    // Already included in the computation
-    // Returns acknowledgement
-    if (isComputing) {
-      ack.finished = ComputationFinished();
-      ack.finished.done = false;
-
-      this.logger.i('Already in a computation. Sending empty response.');
-
-      return ack;
-    }
-
-    // TODO: Start the computation
-    isComputing = true;
-
-    this.logger.i('Started the computation.');
-
-    // Nothing is returned as the computation is not finished yet
-    // But gRPC requires to return something thus sending empty request
-    ack.nothing = new Empty();
-    return ack;
   }
 
   /// Tries to find a root node in the local network.
@@ -79,7 +41,7 @@ class DartminatorNode extends NodeServiceBase {
   /// If a node responds, it is added as [root] and an acknowledgement is sent back.
   /// Otherwise no root is set and [findRoot] is terminated by the higher level function
   /// as a result of a Future timeout.
-  Future<Null> findRoot() async {
+  Future<void> findRoot() async {
     logger.i('Starting the search for a root.');
 
     // Socket used to send and receive messages
@@ -108,12 +70,12 @@ class DartminatorNode extends NodeServiceBase {
               // Creates the gRPC channel on the port 50051 with no credentials
               // And timeout of 30 seconds
               ClientChannel rootChannel = ClientChannel(response.address,
-                  port: 50051,
+                  port: grpcPort,
                   options: const ChannelOptions(
                       credentials: ChannelCredentials.insecure()));
               // Creates the Dartminator Node stub to use for communication
               root = NodeClient(rootChannel,
-                  options: CallOptions(timeout: const Duration(seconds: 30)));
+                  options: CallOptions(timeout: grpcCallTimeout));
 
               // Sends the acknowledgement back to the root
               socket.send('Dartminator-RootAdded'.codeUnits, response.address,
@@ -132,8 +94,8 @@ class DartminatorNode extends NodeServiceBase {
     }).asFuture();
 
     // Sends out the broadcast message with it's own name.
-    socket.send('Dartminator-Name${name}'.codeUnits,
-        io.InternetAddress("255.255.255.255"), this.discoveryPort);
+    socket.send('Dartminator-Name$name'.codeUnits,
+        io.InternetAddress("255.255.255.255"), discoveryPort);
 
     // Waits for the stream to finish.
     await stream;
@@ -145,16 +107,16 @@ class DartminatorNode extends NodeServiceBase {
   /// If a new node is found, a response with the name of this node is sent back.
   /// On receiving the acknowledgement from the child, it is added to the list.
   /// New children will not be added or listened to, if the maximum limit is reached.
-  Future<Null> listenForChildren() async {
+  Future<void> listenForChildren() async {
     var socket = await io.RawDatagramSocket.bind(
         io.InternetAddress.anyIPv4, discoveryPort);
     socket.readEventsEnabled = true;
 
     logger.i('Listening for potential children on port $discoveryPort.');
 
-    socket.listen((event) {
+    childrenStream = socket.listen((event) {
       try {
-        if (event == io.RawSocketEvent.read && children.length < maxChildren) {
+        if (event == io.RawSocketEvent.read) {
           var response = socket.receive();
 
           if (response != null) {
@@ -165,16 +127,22 @@ class DartminatorNode extends NodeServiceBase {
               // Creates the gRPC channel on the port 50051 with no credentials
               // And timeout of 30 seconds
               ClientChannel childChannel = ClientChannel(response.address,
-                  port: 50051,
+                  port: grpcPort,
                   options: ChannelOptions(
                       credentials: ChannelCredentials.insecure()));
 
               // Creates the Dartminator Node stub to use for communication
-              children.add(NodeClient(childChannel,
-                  options: CallOptions(timeout: const Duration(seconds: 30))));
+              var child = NodeClient(childChannel,
+                  options: CallOptions(timeout: grpcCallTimeout));
+              children.add(child);
+
+              // Stop accepting new children when the limit is reached
+              if (children.length >= maxChildren) {
+                childrenStream.pause();
+              }
             } else if (payload.split('Name')[1] != name) {
               logger.i('Found a new potential child at ${response.address}.');
-              socket.send('Dartminator-Name${name}'.codeUnits, response.address,
+              socket.send('Dartminator-Name$name'.codeUnits, response.address,
                   response.port);
             }
           }
@@ -185,5 +153,11 @@ class DartminatorNode extends NodeServiceBase {
         logger.e(stacktrace);
       }
     });
+  }
+
+  @override
+  Stream<ComputationHeartbeat> initiate(ServiceCall call, ComputationArgument request) {
+    // TODO: implement initiate
+    throw UnimplementedError();
   }
 }
