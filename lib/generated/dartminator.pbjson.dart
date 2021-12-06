@@ -12,23 +12,23 @@ import 'dart:typed_data' as $typed_data;
 const ComputationArgument$json = const {
   '1': 'ComputationArgument',
   '2': const [
-    const {'1': 'argument', '3': 1, '4': 1, '5': 11, '6': '.google.protobuf.Any', '10': 'argument'},
+    const {'1': 'argument', '3': 1, '4': 1, '5': 9, '10': 'argument'},
   ],
 };
 
 /// Descriptor for `ComputationArgument`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List computationArgumentDescriptor = $convert.base64Decode('ChNDb21wdXRhdGlvbkFyZ3VtZW50EjAKCGFyZ3VtZW50GAEgASgLMhQuZ29vZ2xlLnByb3RvYnVmLkFueVIIYXJndW1lbnQ=');
+final $typed_data.Uint8List computationArgumentDescriptor = $convert.base64Decode('ChNDb21wdXRhdGlvbkFyZ3VtZW50EhoKCGFyZ3VtZW50GAEgASgJUghhcmd1bWVudA==');
 @$core.Deprecated('Use computationResultDescriptor instead')
 const ComputationResult$json = const {
   '1': 'ComputationResult',
   '2': const [
     const {'1': 'done', '3': 1, '4': 1, '5': 8, '10': 'done'},
-    const {'1': 'result', '3': 2, '4': 1, '5': 11, '6': '.google.protobuf.Any', '10': 'result'},
+    const {'1': 'result', '3': 2, '4': 1, '5': 9, '10': 'result'},
   ],
 };
 
 /// Descriptor for `ComputationResult`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List computationResultDescriptor = $convert.base64Decode('ChFDb21wdXRhdGlvblJlc3VsdBISCgRkb25lGAEgASgIUgRkb25lEiwKBnJlc3VsdBgCIAEoCzIULmdvb2dsZS5wcm90b2J1Zi5BbnlSBnJlc3VsdA==');
+final $typed_data.Uint8List computationResultDescriptor = $convert.base64Decode('ChFDb21wdXRhdGlvblJlc3VsdBISCgRkb25lGAEgASgIUgRkb25lEhYKBnJlc3VsdBgCIAEoCVIGcmVzdWx0');
 @$core.Deprecated('Use computationHeartbeatDescriptor instead')
 const ComputationHeartbeat$json = const {
   '1': 'ComputationHeartbeat',

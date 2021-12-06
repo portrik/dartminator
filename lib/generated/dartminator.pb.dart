@@ -9,18 +9,17 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'google/protobuf/any.pb.dart' as $1;
-import 'google/protobuf/empty.pb.dart' as $2;
+import 'google/protobuf/empty.pb.dart' as $1;
 
 class ComputationArgument extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ComputationArgument', createEmptyInstance: create)
-    ..aOM<$1.Any>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'argument', subBuilder: $1.Any.create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'argument')
     ..hasRequiredFields = false
   ;
 
   ComputationArgument._() : super();
   factory ComputationArgument({
-    $1.Any? argument,
+    $core.String? argument,
   }) {
     final _result = create();
     if (argument != null) {
@@ -50,28 +49,26 @@ class ComputationArgument extends $pb.GeneratedMessage {
   static ComputationArgument? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $1.Any get argument => $_getN(0);
+  $core.String get argument => $_getSZ(0);
   @$pb.TagNumber(1)
-  set argument($1.Any v) { setField(1, v); }
+  set argument($core.String v) { $_setString(0, v); }
   @$pb.TagNumber(1)
   $core.bool hasArgument() => $_has(0);
   @$pb.TagNumber(1)
   void clearArgument() => clearField(1);
-  @$pb.TagNumber(1)
-  $1.Any ensureArgument() => $_ensure(0);
 }
 
 class ComputationResult extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ComputationResult', createEmptyInstance: create)
     ..aOB(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'done')
-    ..aOM<$1.Any>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'result', subBuilder: $1.Any.create)
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'result')
     ..hasRequiredFields = false
   ;
 
   ComputationResult._() : super();
   factory ComputationResult({
     $core.bool? done,
-    $1.Any? result,
+    $core.String? result,
   }) {
     final _result = create();
     if (done != null) {
@@ -113,15 +110,13 @@ class ComputationResult extends $pb.GeneratedMessage {
   void clearDone() => clearField(1);
 
   @$pb.TagNumber(2)
-  $1.Any get result => $_getN(1);
+  $core.String get result => $_getSZ(1);
   @$pb.TagNumber(2)
-  set result($1.Any v) { setField(2, v); }
+  set result($core.String v) { $_setString(1, v); }
   @$pb.TagNumber(2)
   $core.bool hasResult() => $_has(1);
   @$pb.TagNumber(2)
   void clearResult() => clearField(2);
-  @$pb.TagNumber(2)
-  $1.Any ensureResult() => $_ensure(1);
 }
 
 enum ComputationHeartbeat_Content {
@@ -139,14 +134,14 @@ class ComputationHeartbeat extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ComputationHeartbeat', createEmptyInstance: create)
     ..oo(0, [1, 2])
     ..aOM<ComputationResult>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'result', subBuilder: ComputationResult.create)
-    ..aOM<$2.Empty>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'empty', subBuilder: $2.Empty.create)
+    ..aOM<$1.Empty>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'empty', subBuilder: $1.Empty.create)
     ..hasRequiredFields = false
   ;
 
   ComputationHeartbeat._() : super();
   factory ComputationHeartbeat({
     ComputationResult? result,
-    $2.Empty? empty,
+    $1.Empty? empty,
   }) {
     final _result = create();
     if (result != null) {
@@ -193,14 +188,14 @@ class ComputationHeartbeat extends $pb.GeneratedMessage {
   ComputationResult ensureResult() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $2.Empty get empty => $_getN(1);
+  $1.Empty get empty => $_getN(1);
   @$pb.TagNumber(2)
-  set empty($2.Empty v) { setField(2, v); }
+  set empty($1.Empty v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasEmpty() => $_has(1);
   @$pb.TagNumber(2)
   void clearEmpty() => clearField(2);
   @$pb.TagNumber(2)
-  $2.Empty ensureEmpty() => $_ensure(1);
+  $1.Empty ensureEmpty() => $_ensure(1);
 }
 

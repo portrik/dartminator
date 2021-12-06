@@ -3,30 +3,28 @@ import 'dart:io';
 import 'package:faker/faker.dart';
 
 class CLIOptions {
-  bool interactive = false;
+  bool start = false;
   String name = Faker().person.name();
   int port = 8080;
   int maxChildren = 2;
 }
 
-CLIOptions handleCLI(List<String> args) {
+// TODO: Add interactive CLI with Isolates
+
+CLIOptions startupCLI(List<String> args) {
   var options = CLIOptions();
 
   if (args.contains('-h') || args.contains('--help')) {
     stdout.writeln('Dartminator CLI Arguments:\n');
     stdout.writeln('-h / --help\t\tPrint out this message');
-    stdout.writeln('-i / --interactive\tStart in the interactive mode');
     stdout.writeln(
         '-n / --name [NAME]\tSets the name of the node. Should be unique inside the network');
     stdout.writeln(
         '-p / --port [PORT]\tSets the port over which the nodes are discovered');
     stdout.writeln(
         '-m / --max [MAX]\tSets the maximum number of children the node can have');
+    stdout.writeln('-s / --start\t\tStarts the computation.');
     exit(0);
-  }
-
-  if (args.contains('-i') || args.contains('--interactive')) {
-    options.interactive = true;
   }
 
   if (args.contains('-n') || args.contains('--name')) {
@@ -57,6 +55,10 @@ CLIOptions handleCLI(List<String> args) {
     }
 
     options.maxChildren = int.parse(args[index + 1]);
+  }
+
+  if (args.contains('-s') || args.contains('--start')) {
+    options.start = true;
   }
 
   return options;

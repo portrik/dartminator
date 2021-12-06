@@ -1,3 +1,3 @@
-const rootSearchTimeout = Duration(seconds: 1);
+const childSearchTimeout = Duration(seconds: 10);
 const grpcPort = 50051;
-const grpcCallTimeout = Duration(seconds: 1);
+const grpcCallTimeout = Duration(seconds: 100);

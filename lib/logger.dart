@@ -2,6 +2,8 @@ import 'dart:io' as io;
 
 import 'package:logger/logger.dart';
 
+// TODO: Remove the dependency on asserts
+// TODO: Log to files
 Logger getLogger() {
   return Logger(
       printer: PrettyPrinter(
