@@ -9,8 +9,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'google/protobuf/empty.pb.dart' as $1;
-
 class ComputationArgument extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ComputationArgument', createEmptyInstance: create)
     ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'argument')
@@ -134,14 +132,14 @@ class ComputationHeartbeat extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ComputationHeartbeat', createEmptyInstance: create)
     ..oo(0, [1, 2])
     ..aOM<ComputationResult>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'result', subBuilder: ComputationResult.create)
-    ..aOM<$1.Empty>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'empty', subBuilder: $1.Empty.create)
+    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'empty')
     ..hasRequiredFields = false
   ;
 
   ComputationHeartbeat._() : super();
   factory ComputationHeartbeat({
     ComputationResult? result,
-    $1.Empty? empty,
+    $core.bool? empty,
   }) {
     final _result = create();
     if (result != null) {
@@ -188,14 +186,12 @@ class ComputationHeartbeat extends $pb.GeneratedMessage {
   ComputationResult ensureResult() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $1.Empty get empty => $_getN(1);
+  $core.bool get empty => $_getBF(1);
   @$pb.TagNumber(2)
-  set empty($1.Empty v) { setField(2, v); }
+  set empty($core.bool v) { $_setBool(1, v); }
   @$pb.TagNumber(2)
   $core.bool hasEmpty() => $_has(1);
   @$pb.TagNumber(2)
   void clearEmpty() => clearField(2);
-  @$pb.TagNumber(2)
-  $1.Empty ensureEmpty() => $_ensure(1);
 }
 

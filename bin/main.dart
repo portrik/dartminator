@@ -23,7 +23,7 @@ Future<void> main(List<String> args) async {
     await node.init();
 
     if (options.start) {
-      await node.start('start');
+      await node.start('STARTER');
     }
   } catch (err, stacktrace) {
     logger.e('The node has failed terribly!');

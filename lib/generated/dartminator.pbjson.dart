@@ -34,7 +34,7 @@ const ComputationHeartbeat$json = const {
   '1': 'ComputationHeartbeat',
   '2': const [
     const {'1': 'result', '3': 1, '4': 1, '5': 11, '6': '.ComputationResult', '9': 0, '10': 'result'},
-    const {'1': 'empty', '3': 2, '4': 1, '5': 11, '6': '.google.protobuf.Empty', '9': 0, '10': 'empty'},
+    const {'1': 'empty', '3': 2, '4': 1, '5': 8, '9': 0, '10': 'empty'},
   ],
   '8': const [
     const {'1': 'content'},
@@ -42,4 +42,4 @@ const ComputationHeartbeat$json = const {
 };
 
 /// Descriptor for `ComputationHeartbeat`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List computationHeartbeatDescriptor = $convert.base64Decode('ChRDb21wdXRhdGlvbkhlYXJ0YmVhdBIsCgZyZXN1bHQYASABKAsyEi5Db21wdXRhdGlvblJlc3VsdEgAUgZyZXN1bHQSLgoFZW1wdHkYAiABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIAFIFZW1wdHlCCQoHY29udGVudA==');
+final $typed_data.Uint8List computationHeartbeatDescriptor = $convert.base64Decode('ChRDb21wdXRhdGlvbkhlYXJ0YmVhdBIsCgZyZXN1bHQYASABKAsyEi5Db21wdXRhdGlvblJlc3VsdEgAUgZyZXN1bHQSFgoFZW1wdHkYAiABKAhIAFIFZW1wdHlCCQoHY29udGVudA==');

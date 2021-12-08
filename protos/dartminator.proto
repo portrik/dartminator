@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
-
 // Dijkstra-Scholten:
 // 1. The Initiator of the computation becomes the root of the tree
 //     and sends out a computational message
@@ -29,6 +27,6 @@ message ComputationResult {
 message ComputationHeartbeat {
     oneof content {
         ComputationResult result = 1;
-        google.protobuf.Empty empty = 2;
+        bool empty = 2;
     }
 }

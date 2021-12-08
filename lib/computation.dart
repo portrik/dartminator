@@ -32,6 +32,7 @@ class TestComputation implements Computation {
 
   @override
   List<String> getArguments(String seed) {
-    return List<String>.generate(2, (index) => 'START');
+    return List<String>.generate(
+        seed == 'STARTER' ? 2 : 1, (_index) => 'COMPUTE');
   }
 }

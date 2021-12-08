@@ -41,7 +41,7 @@ class DartminatorNode extends NodeServiceBase {
 
   // Internally handled variables
   final List<io.InternetAddress> _children = [];
-  late StreamSubscription<io.RawSocketEvent> _listeningStream;
+  var _isComputing = false;
 
   DartminatorNode(this.name, this.discoveryPort, this.maxChildren) {
     logger.i('Created Node $name for the ${computation.name} computation.');
@@ -62,19 +62,11 @@ class DartminatorNode extends NodeServiceBase {
   Future<String> start(String seed) async {
     logger.i('Starting the computation with seed $seed.');
 
-    if (!_listeningStream.isPaused) {
-      logger.d('Paused listening for incoming connections.');
-      _listeningStream.pause();
-    }
-
     var completed = computation
         .finalizeResult(await compute(computation.getArguments(seed)));
 
     logger
         .i('All of the computations are completed. The result is: $completed.');
-
-    logger.d('Resuming listening for incoming connections.');
-    _listeningStream.resume();
 
     return completed;
   }
@@ -87,6 +79,7 @@ class DartminatorNode extends NodeServiceBase {
   /// through [handleChildComputation].
   Future<List<String>> compute(List<String> arguments) async {
     logger.i('Starting the computation with ${arguments.length} arguments.');
+    _isComputing = true;
 
     var results = List<String>.generate(arguments.length, (_index) => '');
 
@@ -113,18 +106,20 @@ class DartminatorNode extends NodeServiceBase {
       }
 
       // If there is a space for children, new ones are added
-      if (_children.length < maxChildren) {
-        logger.i('Looking for children to add to the computation.');
+      // Subtracting one since the main node takes one argument
+      var childLimit =
+          (results.where((element) => element.isEmpty).length - 1) < maxChildren
+              ? (results.where((element) => element.isEmpty).length - 1)
+              : maxChildren;
+
+      if (_children.length < childLimit) {
+        logger.i('Redistributing the computation to child nodes.');
 
         // Looks for children until the timeout is reached
-        await findChildren(maxChildren <
-                    results.where((element) => element.isNotEmpty).length
-                ? maxChildren
-                : results.where((element) => element.isNotEmpty).length)
-            .timeout(
+        await findChildren(childLimit).timeout(
           childSearchTimeout,
           onTimeout: () {
-            logger.i(
+            logger.d(
                 'The child search has finished with ${_children.length} child nodes.');
           },
         );
@@ -136,17 +131,18 @@ class DartminatorNode extends NodeServiceBase {
 
           if (index > -1) {
             Map<String, dynamic> data = {};
+            var child = _children[i];
             data['port'] = port.sendPort;
-            data['child'] = _children[i];
+            data['child'] = child;
             data['argument'] = arguments[index];
 
             workers.add(port.listen((data) {
               results[index] = data ?? '';
 
               logger.d(
-                  'The computation of child ${_children[i]} has finished with $data.');
+                  'The computation of child $child has finished with $data.');
 
-              _children.remove(_children[i]);
+              _children.remove(child);
               port.close();
             }).asFuture<String?>());
 
@@ -161,6 +157,7 @@ class DartminatorNode extends NodeServiceBase {
           'Finished computation cycle. ${arguments.length - results.where((element) => element.isNotEmpty).length} chunks remaining.');
     }
 
+    _isComputing = false;
     return results;
   }
 
@@ -190,14 +187,16 @@ class DartminatorNode extends NodeServiceBase {
             logger.d(
                 'Child Search: Got response from $responderName at ${response.address}');
 
-            if (responderName != name && _children.length < maxChildren) {
-              logger.d('Adding $responderName as a child.');
+            // Prevents from connecting to self
+            // To already connected node
+            // Or reaching the connection limit
+            if (responderName != name &&
+                !_children.contains(response.address) &&
+                _children.length < maxChildren) {
+              logger.d(
+                  'Adding $responderName at ${response.address} to children!');
 
               _children.add(response.address);
-
-              // Sends the acknowledgement back to the root
-              socket.send('Dartminator-ChildAdded'.codeUnits, response.address,
-                  response.port);
 
               // Closes the socket as it is not needed anymore.
               if (_children.length >= limit) {
@@ -207,9 +206,7 @@ class DartminatorNode extends NodeServiceBase {
           }
         }
       } catch (err, stacktrace) {
-        logger.e('Could not parse incoming message!');
-        logger.e(err);
-        logger.e(stacktrace);
+        logger.e('Could not parse incoming message!\n$err\n$stacktrace');
       }
     }).asFuture();
 
@@ -234,20 +231,19 @@ class DartminatorNode extends NodeServiceBase {
 
     logger.i('Listening for potential computation on port $discoveryPort.');
 
-    _listeningStream = socket.listen((event) {
+    socket.listen((event) {
       try {
         if (event == io.RawSocketEvent.read) {
           var response = socket.receive();
 
           if (response != null) {
+            logger.d(
+                'Computation listening response: ${utf8.decode(response.data)}');
+
             var payload = utf8.decode(response.data).split('-')[1];
 
-            if (payload == 'ChildAdded') {
-              logger.i('Added as a child to ${response.address}.');
-
-              _listeningStream.pause();
-            } else if (payload.split('Name')[1] != name) {
-              logger.i(
+            if (payload.split('Name')[1] != name) {
+              logger.d(
                   'Found a new potential computation from ${payload.split('Name')[1]} at ${response.address}.');
 
               socket.send('Dartminator-Name$name'.codeUnits, response.address,
@@ -256,9 +252,8 @@ class DartminatorNode extends NodeServiceBase {
           }
         }
       } catch (err, stacktrace) {
-        logger.e('Could not parse response during computation listening!');
-        logger.e(err);
-        logger.e(stacktrace);
+        logger.e(
+            'Could not parse response during computation listening!\n$err\n$stacktrace');
       }
     });
   }
@@ -294,6 +289,11 @@ class DartminatorNode extends NodeServiceBase {
       await for (var response in responses) {
         logger.d('Response from child ${data['child']}: $response');
 
+        if (response.empty) {
+          logger.w('The child ${data['child']} is already in a computation!');
+          break;
+        }
+
         if (response.result.done) {
           logger.d(
               'The child ${data['child']} has finished with ${response.result.result}.');
@@ -306,9 +306,7 @@ class DartminatorNode extends NodeServiceBase {
       await clientChannel.shutdown();
       port.send(result);
     } catch (err, stacktrace) {
-      logger.e('The connection with a child has failed.');
-      logger.e(err);
-      logger.e(stacktrace);
+      logger.e('The connection with a child has failed!\n$err\n$stacktrace');
 
       port.send(null);
     }
@@ -331,10 +329,8 @@ class DartminatorNode extends NodeServiceBase {
       logger.d('This node\'s computation has completed with the result $data.');
 
       port.send(result);
-    } catch (e, stacktrace) {
-      logger.e('The main computation has thrown an error!');
-      logger.e(e);
-      logger.e(stacktrace);
+    } catch (err, stacktrace) {
+      logger.e('The main computation has thrown an error!\n$err\n$stacktrace');
 
       port.send(null);
     }
@@ -343,14 +339,16 @@ class DartminatorNode extends NodeServiceBase {
   @override
   Stream<ComputationHeartbeat> initiate(
       ServiceCall call, ComputationArgument request) async* {
-    logger.i('Starting the computation as a child.');
     logger.d('Heartbeat request: $request');
 
-    if (!_listeningStream.isPaused) {
-      logger.d('Stopped listening for incoming connections.');
-      _listeningStream.pause();
+    if (_isComputing) {
+      logger.i(
+          'Received a heartbeat request while in a computation. Returning empty response.');
+
+      yield ComputationHeartbeat(empty: true);
     }
 
+    logger.i('Starting the computation as a child.');
     String? result;
 
     compute(computation.getArguments(request.argument)).then((results) {
@@ -358,7 +356,7 @@ class DartminatorNode extends NodeServiceBase {
     });
 
     while (result == null) {
-      logger.d(
+      logger.i(
           'Still computing. Returning an empty heartbeat and waiting for $calculationTimeout.');
 
       var response = await Future.delayed(calculationTimeout,
@@ -369,8 +367,7 @@ class DartminatorNode extends NodeServiceBase {
     logger.i('Finished computation. Returning heartbeat with the result.');
     yield ComputationHeartbeat(
         result: ComputationResult(done: true, result: result));
-
-    logger.d('Resuming listening for incoming connections.');
-    _listeningStream.resume();
   }
+
+  bool isComputing() => _isComputing;
 }
