@@ -60,17 +60,20 @@ class DartminatorNode extends NodeServiceBase {
   /// Stops listening for incoming computation connections and starts the computation.
   /// Returns when all of the possible results are computed.
   Future<String> start(String seed) async {
-    logger.i('Starting the computation.');
+    logger.i('Starting the computation with seed $seed.');
 
     if (!_listeningStream.isPaused) {
+      logger.d('Paused listening for incoming connections.');
       _listeningStream.pause();
     }
 
     var completed = computation
         .finalizeResult(await compute(computation.getArguments(seed)));
 
-    logger.i('All of the computations are completed.');
-    logger.i('The result is: $completed.');
+    logger
+        .i('All of the computations are completed. The result is: $completed.');
+
+    logger.d('Resuming listening for incoming connections.');
     _listeningStream.resume();
 
     return completed;
@@ -83,6 +86,8 @@ class DartminatorNode extends NodeServiceBase {
   /// Any children found are assigned their arguments and their computation is handled
   /// through [handleChildComputation].
   Future<List<String>> compute(List<String> arguments) async {
+    logger.i('Starting the computation with ${arguments.length} arguments.');
+
     var results = List<String>.generate(arguments.length, (_index) => '');
 
     // Stops when all of the results are computed
@@ -99,9 +104,6 @@ class DartminatorNode extends NodeServiceBase {
         mainData['argument'] = arguments[index];
 
         workers.add(mainPort.listen((data) {
-          logger.i(
-              'This node\'s computation has completed with the result $data.');
-
           results[index] = data ?? '';
           mainPort.close();
         }).asFuture<String?>());
@@ -141,7 +143,7 @@ class DartminatorNode extends NodeServiceBase {
             workers.add(port.listen((data) {
               results[index] = data ?? '';
 
-              logger.i(
+              logger.d(
                   'The computation of child ${_children[i]} has finished with $data.');
 
               _children.remove(_children[i]);
@@ -167,7 +169,7 @@ class DartminatorNode extends NodeServiceBase {
   /// Sends out a broadcast message over the local network looking for child nodes.
   /// If a node responds, it is added to [_children] and an acknowledgement is sent back.
   Future<void> findChildren(int limit) async {
-    logger.i('Starting the search for children.');
+    logger.d('Starting the search for children.');
 
     // Socket used to send and receive messages
     var socket = await io.RawDatagramSocket.bind(io.InternetAddress.anyIPv4, 0);
@@ -185,11 +187,11 @@ class DartminatorNode extends NodeServiceBase {
             var responderName =
                 utf8.decode(response.data).split('-')[1].split('Name')[1];
 
-            logger.i(
+            logger.d(
                 'Child Search: Got response from $responderName at ${response.address}');
 
             if (responderName != name && _children.length < maxChildren) {
-              logger.i('Adding $responderName as a child.');
+              logger.d('Adding $responderName as a child.');
 
               _children.add(response.address);
 
@@ -272,7 +274,7 @@ class DartminatorNode extends NodeServiceBase {
     SendPort port = data['port'];
 
     try {
-      logger.i('Started child handler for ${data['child']}.');
+      logger.d('Started child handler for ${data['child']}.');
 
       // Creates the gRPC channel on the port 50051 with no credentials
       ClientChannel clientChannel = ClientChannel(data['child'],
@@ -290,11 +292,10 @@ class DartminatorNode extends NodeServiceBase {
 
       // Listens to responses from the child node
       await for (var response in responses) {
-        logger.i('Response from child ${data['child']}: $response');
-        var isDone = response.result.done;
+        logger.d('Response from child ${data['child']}: $response');
 
-        if (isDone) {
-          logger.i(
+        if (response.result.done) {
+          logger.d(
               'The child ${data['child']} has finished with ${response.result.result}.');
 
           result = response.result.result;
@@ -322,10 +323,12 @@ class DartminatorNode extends NodeServiceBase {
     SendPort port = data['port'];
 
     try {
-      logger.i(
+      logger.d(
           'Starting main node computation from the argument ${data['argument']}.');
 
       var result = await DartminatorNode.computation.compute(data['argument']);
+
+      logger.d('This node\'s computation has completed with the result $data.');
 
       port.send(result);
     } catch (e, stacktrace) {
@@ -340,9 +343,11 @@ class DartminatorNode extends NodeServiceBase {
   @override
   Stream<ComputationHeartbeat> initiate(
       ServiceCall call, ComputationArgument request) async* {
-    logger.i('Heartbeat request: $request');
+    logger.i('Starting the computation as a child.');
+    logger.d('Heartbeat request: $request');
 
     if (!_listeningStream.isPaused) {
+      logger.d('Stopped listening for incoming connections.');
       _listeningStream.pause();
     }
 
@@ -353,7 +358,7 @@ class DartminatorNode extends NodeServiceBase {
     });
 
     while (result == null) {
-      logger.i(
+      logger.d(
           'Still computing. Returning an empty heartbeat and waiting for $calculationTimeout.');
 
       var response = await Future.delayed(calculationTimeout,
@@ -365,6 +370,7 @@ class DartminatorNode extends NodeServiceBase {
     yield ComputationHeartbeat(
         result: ComputationResult(done: true, result: result));
 
+    logger.d('Resuming listening for incoming connections.');
     _listeningStream.resume();
   }
 }

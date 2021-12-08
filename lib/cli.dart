@@ -4,6 +4,7 @@ import 'package:faker/faker.dart';
 
 class CLIOptions {
   bool start = false;
+  bool interactive = false;
   String name = Faker().person.name();
   int port = 8080;
   int maxChildren = 2;
@@ -17,6 +18,8 @@ CLIOptions startupCLI(List<String> args) {
   if (args.contains('-h') || args.contains('--help')) {
     stdout.writeln('Dartminator CLI Arguments:\n');
     stdout.writeln('-h / --help\t\tPrint out this message');
+    stdout.writeln(
+        '-i / --interactive [NAME]\tStarts the node in interactive mode.');
     stdout.writeln(
         '-n / --name [NAME]\tSets the name of the node. Should be unique inside the network');
     stdout.writeln(
@@ -35,6 +38,10 @@ CLIOptions startupCLI(List<String> args) {
     }
 
     options.name = args[index + 1];
+  }
+
+  if (args.contains('-i') || args.contains('--interactive')) {
+    options.interactive = true;
   }
 
   if (args.contains('-p') || args.contains('--port')) {
