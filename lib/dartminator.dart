@@ -365,6 +365,7 @@ class DartminatorNode extends NodeServiceBase {
     }
 
     logger.i('Finished computation. Returning heartbeat with the result.');
+    logger.i('Listening to new computation connections.');
     yield ComputationHeartbeat(
         result: ComputationResult(done: true, result: result));
   }
