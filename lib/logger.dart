@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:logger/logger.dart';
 
+var consoleLogging = true;
+
 /// Custom filter used instead of the default Logger one.
 ///
 /// A custom filter is needed to remove the dependency on the default filter
@@ -29,7 +31,9 @@ class CustomOutput extends LogOutput {
   @override
   void output(OutputEvent event) {
     for (final line in event.lines) {
-      if (event.level != Level.debug && event.level != Level.verbose) {
+      if (event.level != Level.debug &&
+          event.level != Level.verbose &&
+          consoleLogging) {
         var decoded = jsonDecode(line);
         io.stdout.writeln(
             '[${DateTime.fromMillisecondsSinceEpoch(decoded['time']).toLocal()}] ${decoded['level']}:\t${decoded['msg']}');
@@ -40,6 +44,9 @@ class CustomOutput extends LogOutput {
   }
 }
 
+/// A custom printer used to log data in a better way.
+///
+/// A custom printer that formats the messages into a pino-like JSON format.
 class CustomPrinter extends LogPrinter {
   static final levelNames = {
     Level.verbose: 'Verbose',

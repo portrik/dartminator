@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dartminator/computation.dart';
 import 'package:grpc/grpc.dart';
 
 import 'package:dartminator/dartminator.dart';
@@ -13,8 +14,8 @@ Future<void> main(List<String> args) async {
   try {
     var options = startupCLI(args);
 
-    final node =
-        DartminatorNode(options.name, options.port, options.maxChildren);
+    final node = DartminatorNode(
+        options.name, options.port, options.maxChildren, TestComputation());
 
     final server = Server([node], const <Interceptor>[],
         CodecRegistry(codecs: const [GzipCodec(), IdentityCodec()]));
