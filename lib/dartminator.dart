@@ -6,7 +6,6 @@ import 'dart:async';
 import 'package:grpc/grpc.dart';
 
 import 'package:dartminator/generated/dartminator.pbgrpc.dart';
-import 'package:dartminator/generated/dartminator.pb.dart';
 
 import 'computation.dart';
 import 'constants.dart';
@@ -350,7 +349,6 @@ class DartminatorNode extends NodeServiceBase {
 
     logger.i('Starting the computation as a child.');
     String? result;
-
     compute(computation.getArguments(request.argument)).then((results) {
       result = computation.finalizeResult(results);
     });
@@ -366,6 +364,7 @@ class DartminatorNode extends NodeServiceBase {
 
     logger.i('Finished computation. Returning heartbeat with the result.');
     logger.i('Listening to new computation connections.');
+
     yield ComputationHeartbeat(
         result: ComputationResult(done: true, result: result));
   }

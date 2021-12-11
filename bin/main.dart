@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:grpc/grpc.dart';
 
 import 'package:dartminator/dartminator.dart';
@@ -24,6 +26,7 @@ Future<void> main(List<String> args) async {
 
     if (options.start) {
       await node.start('STARTER');
+      exit(0);
     }
   } catch (err, stacktrace) {
     logger.e('The node has failed terribly!');

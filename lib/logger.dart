@@ -1,8 +1,12 @@
 import 'dart:io' as io;
+import 'dart:convert';
 
 import 'package:logger/logger.dart';
 
-// Custom filter is used to disable the default one using assert
+/// Custom filter used instead of the default Logger one.
+///
+/// A custom filter is needed to remove the dependency on the default filter
+/// which uses assert and thus can't be used in production.
 class CustomFilter extends LogFilter {
   @override
   bool shouldLog(LogEvent event) {
@@ -10,44 +14,57 @@ class CustomFilter extends LogFilter {
   }
 }
 
-// Writer used to store logs into a file
-class FileWriter {
+/// Custom log output to write logs both to console and file.
+///
+/// A class handling the logging to both console and file outputs.
+/// Both debug and verbose level messages are not logged to console
+/// and are only written to files.
+///
+/// The file to which to append the messages is set by the [fileName] argument.
+class CustomOutput extends LogOutput {
   io.File file;
 
-  FileWriter(String name) : file = io.File(name);
-
-  void writeLine(String line) {
-    file.writeAsStringSync('$line\n', mode: io.FileMode.append);
-  }
-}
-
-// Custom log output to write logs both to console and file
-class CustomOutput extends LogOutput {
-  FileWriter fileWriter;
-
-  CustomOutput(String fileName) : fileWriter = FileWriter(fileName);
+  CustomOutput(String fileName) : file = io.File(fileName);
 
   @override
   void output(OutputEvent event) {
     for (final line in event.lines) {
       if (event.level != Level.debug && event.level != Level.verbose) {
-        io.stdout.writeln(line);
+        var decoded = jsonDecode(line);
+        io.stdout.writeln(
+            '[${DateTime.fromMillisecondsSinceEpoch(decoded['time']).toLocal()}] ${decoded['level']}:\t${decoded['msg']}');
       }
 
-      fileWriter.writeLine(line);
+      file.writeAsStringSync('$line\n', mode: io.FileMode.append);
     }
+  }
+}
+
+class CustomPrinter extends LogPrinter {
+  static final levelNames = {
+    Level.verbose: 'Verbose',
+    Level.debug: 'Debug',
+    Level.info: 'Info',
+    Level.warning: 'Warning',
+    Level.error: 'Error',
+    Level.wtf: 'WTF'
+  };
+
+  @override
+  List<String> log(LogEvent event) {
+    var output = {
+      'level': levelNames[event.level],
+      'time': DateTime.now().millisecondsSinceEpoch,
+      'msg': event.message.toString()
+    };
+
+    return [jsonEncode(output)];
   }
 }
 
 Logger getLogger() {
   return Logger(
-      printer: PrettyPrinter(
-          colors: false,
-          printTime: true,
-          lineLength: 120,
-          errorMethodCount: 8,
-          methodCount: 2,
-          printEmojis: false),
+      printer: CustomPrinter(),
       output: CustomOutput('log.txt'),
       level: Level.debug,
       filter: CustomFilter());
