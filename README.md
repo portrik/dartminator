@@ -16,7 +16,7 @@ The Dijkstra–Scholten algorithm is a tree-based algorithm which can be describ
 
 ## Technical Description
 
-Dartminator is written in Dart, using the latest SDK version (``2.15.0``). Dart can be compiled to native code and JavaScript but as Dartminator uses the local network for node discovery, **the JavaScript version will not work**.
+Dartminator is written in Dart, using the latest SDK version (``2.15.1``). Dart can be compiled to native code and JavaScript but as Dartminator uses the local network for node discovery, **the JavaScript version will not work**.
 
 Each node can implement a different type of computation. These nodes can live on the same network and will check the computation type upon discovery.
 
@@ -64,11 +64,11 @@ The code can be also compiled to a native module with ```dart compile exe bin/ma
 
 ### Example commands
 
-| Command                                        | Description                                                                                                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ```dart bin/main.dart```                       | Starts the node with default values. The node will then listen for computations until it is turned off.                                          |
-| ```dart bin/main.dart -n Ferda -p 8081 -m 4``` | Starts the node with custom name, port and max children count. The node will then listen for computations until it is turned off.                |
-| ```dart bin/main.dart -s```                    | Starts the node and initiates the computation. After the computation finishes, the node will listen for new computations until it is turned off. |
+| Command                                        | Description                                                                                                                       |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| ```dart bin/main.dart```                       | Starts the node with default values. The node will then listen for computations until it is terminated.                           |
+| ```dart bin/main.dart -n Ferda -p 8081 -m 4``` | Starts the node with custom name, port and max children count. The node will then listen for computations until it is terminated. |
+| ```dart bin/main.dart -s```                    | Starts the node and initiates the computation. After the computation finishes, the node will terminate.                           |
 
 ## CLI Options
 
