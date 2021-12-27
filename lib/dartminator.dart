@@ -24,14 +24,17 @@ class DartminatorNode extends NodeServiceBase {
   /// Upper limit of possible child connections.
   int maxChildren;
 
+  /// Amount of chunks remaining to be calculated.
+  int _remaining = 0;
+
   /// List of the current child nodes.
   final List<io.InternetAddress> _children = [];
 
-  // Type of the computation
+  /// Type of the computation
   final Computation _computation;
 
   /// Is the current node in a computation?
-  var _isComputing = false;
+  bool _isComputing = false;
 
   DartminatorNode(
       this.name, this.discoveryPort, this.maxChildren, this._computation) {
@@ -56,13 +59,13 @@ class DartminatorNode extends NodeServiceBase {
   Future<String> start(String seed) async {
     logger.i('Starting the computation with seed $seed.');
 
-    var completed = await _computation
-        .finalizeResult(await compute(_computation.getArguments(seed)));
+    var results = await compute(_computation.getArguments(seed));
+    var composed = await _computation.finalizeResult(results);
 
     logger
-        .i('All of the computations are completed. The result is: $completed.');
+        .i('All of the computations are completed. The result is: $composed.');
 
-    return completed;
+    return composed;
   }
 
   /// Computes all of the results on this node and potential child nodes.
@@ -108,7 +111,8 @@ class DartminatorNode extends NodeServiceBase {
         workers.add(mainPort.listen((data) {
           // Registers the result
           results[index] = data ?? '';
-          ++completed;
+          completed = results.where((element) => element.isNotEmpty).length;
+
           // Closes the Isolate port to prevent any possible memory/process issues.
           mainPort.close();
         }).asFuture<String?>());
@@ -154,7 +158,7 @@ class DartminatorNode extends NodeServiceBase {
             workers.add(port.listen((data) {
               // Registers the result.
               results[index] = data ?? '';
-              ++completed;
+              completed = results.where((element) => element.isNotEmpty).length;
 
               // Removes the child from the list.
               _children.remove(child);
@@ -174,8 +178,9 @@ class DartminatorNode extends NodeServiceBase {
 
       // Waits for all of the workers to complete their computation.
       await Future.wait(workers);
-      logger.i(
-          'Finished computation cycle. ${arguments.length - completed} chunk(s) remaining.');
+
+      _remaining = arguments.length - completed;
+      logger.i('Finished computation cycle. $_remaining chunk(s) remaining.');
     }
 
     _isComputing = false;
@@ -378,7 +383,8 @@ class DartminatorNode extends NodeServiceBase {
 
       var result = await computation.compute(data['argument']);
 
-      logger.d('This node\'s computation has completed with the result $data.');
+      logger
+          .d('This node\'s computation has completed with the result $result.');
 
       port.send(result);
     } catch (err, stacktrace) {
@@ -412,9 +418,9 @@ class DartminatorNode extends NodeServiceBase {
     // The delay between heartbeats is set by calculationTimeout.
     while (result == null) {
       logger.i(
-          'Still computing. Returning an empty heartbeat and waiting for $calculationTimeout.');
+          'Still computing. Returning an empty heartbeat and waiting for $heartbeatTimeout.');
 
-      var response = await Future.delayed(calculationTimeout,
+      var response = await Future.delayed(heartbeatTimeout,
           () => ComputationHeartbeat(result: ComputationResult(done: false)));
       yield response;
     }
@@ -427,7 +433,12 @@ class DartminatorNode extends NodeServiceBase {
         result: ComputationResult(done: true, result: result));
   }
 
+  /// Exposes the computing status.
   bool isComputing() => _isComputing;
 
+  /// Exposes the count of currently connected children.
   int connectedChildren() => _children.length;
+
+  /// Exposes the count of remaining chunks of a computation.
+  int remainingChunks() => _remaining;
 }

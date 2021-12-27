@@ -14,9 +14,11 @@ Future<void> main(List<String> args) async {
   try {
     var options = startupCLI(args);
 
+    // Node instance
     final node = DartminatorNode(
         options.name, options.port, options.maxChildren, TestComputation());
 
+    // gRPC server instance
     final server = Server([node], const <Interceptor>[],
         CodecRegistry(codecs: const [GzipCodec(), IdentityCodec()]));
 
