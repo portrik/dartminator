@@ -37,7 +37,15 @@ class TestComputation implements Computation {
 
   @override
   List<String> getArguments(String seed) {
-    return List<String>.generate(
-        seed == 'STARTER' ? 4 : 1, (_index) => 'COMPUTE');
+    var random = Random();
+    int newArgs = 1;
+
+    if (seed == 'STARTER') {
+      newArgs = 4;
+    } else if (random.nextInt(10) >= 7) {
+      newArgs = 2;
+    }
+
+    return List<String>.generate(newArgs, (_index) => 'COMPUTE');
   }
 }
