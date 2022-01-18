@@ -90,9 +90,6 @@ class DartminatorNode extends NodeServiceBase {
     logger.i('The starting arguments are: $arguments');
     _isComputing = true;
 
-    // The result array is generated with empty strings.
-    List<String> results = [];
-
     logger.i('Looking for stranded nodes.');
     for (var argument in arguments) {
       // Look for stranded nodes until the timeout is reached
@@ -115,6 +112,8 @@ class DartminatorNode extends NodeServiceBase {
     logger.i(
         'Child search has finished. ${_children.length} child nodes are attached.');
 
+    // The result array is generated with empty strings.
+    List<String> results = [];
     var workers = <Future<dynamic>>[];
 
     var mainCompleter = Completer();
@@ -180,6 +179,7 @@ class DartminatorNode extends NodeServiceBase {
           } else if (argument != null) {
             // Re-add failed argument
             arguments.add(argument);
+            port.close();
           }
 
           // Send new argument, if any are available
@@ -204,6 +204,46 @@ class DartminatorNode extends NodeServiceBase {
     }
 
     await Future.wait(workers);
+
+    // Handle remaining arguments if all children fail
+    if (results.length < initialArguments.length) {
+      var mainCompleter = Completer();
+      var mainPort = ReceivePort();
+
+      Map<String, dynamic> mainData = {};
+      mainData['port'] = mainPort.sendPort;
+      mainData['computation'] = _computation;
+
+      mainPort.listen((data) {
+        Map<String, dynamic> response = data;
+        SendPort isolatePort = response['port'];
+        String? argument = response['argument'];
+        String? result = response['result'];
+
+        // Register valid result
+        if (result != null) {
+          results.add(result);
+          logger.i(
+              'New result from the main computation. ${(initialArguments.length - results.length) + 1} chunks remaining.');
+        } else if (argument != null) {
+          // Re-add failed argument
+          arguments.add(argument);
+        }
+
+        // Send new argument, if any are available
+        if (arguments.isNotEmpty) {
+          String argument = arguments.removeAt(0);
+          isolatePort.send(argument);
+        } else {
+          // Close the port if no more work is available
+          isolatePort.send(null);
+          mainPort.close();
+        }
+      }, onDone: () => mainCompleter.complete());
+
+      await Isolate.spawn(handleMainComputation, mainData);
+      await mainCompleter.future;
+    }
 
     _isComputing = false;
     logger.i('Finished the main computation.');
@@ -564,6 +604,7 @@ class DartminatorNode extends NodeServiceBase {
 
     logger.i('Finished computation. Returning result to the parent.');
     _strandedResult = result;
+    _isComputing = false;
 
     // The computation has finished. Returning the result.
     yield ComputationHeartbeat(
