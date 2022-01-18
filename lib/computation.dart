@@ -21,6 +21,8 @@ class TestComputation implements Computation {
   @override
   String name = 'Test';
 
+  int index = 0;
+
   @override
   Future<String> compute(String argument) async {
     var rng = Random();
@@ -43,9 +45,12 @@ class TestComputation implements Computation {
     if (seed == 'STARTER') {
       newArgs = 4;
     } else if (random.nextInt(10) >= 7) {
-      newArgs = 2;
+      newArgs = random.nextInt(3);
     }
 
-    return List<String>.generate(newArgs, (_index) => 'COMPUTE');
+    return List<String>.generate(newArgs, (_index) {
+      ++index;
+      return '$index';
+    });
   }
 }

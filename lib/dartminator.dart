@@ -87,10 +87,11 @@ class DartminatorNode extends NodeServiceBase {
   Future<List<String>> compute(List<String> initialArguments) async {
     var arguments = [...initialArguments];
     logger.i('Starting the computation of ${arguments.length} chunks.');
+    logger.i('The starting arguments are: $arguments');
     _isComputing = true;
 
     // The result array is generated with empty strings.
-    var results = List<String>.generate(arguments.length, (_index) => '');
+    List<String> results = [];
 
     logger.i('Looking for stranded nodes.');
     for (var argument in arguments) {
@@ -99,22 +100,20 @@ class DartminatorNode extends NodeServiceBase {
         logger.d('No stranded node found in time.');
       });
     }
-    logger.i('The search for stranded nodes has finished.');
+    logger.i(
+        'The search for stranded nodes has finished with ${_children.length} nodes.');
 
-    // If there is a space for children, new ones are added.
-    var childLimit =
-        (results.where((element) => element.isEmpty).length) < maxChildren
-            ? (results.where((element) => element.isEmpty).length)
-            : maxChildren;
-
+    logger.i('Looking for child nodes.');
     // Looks for children until the timeout is reached
-    await findChildren(childLimit).timeout(
+    await findChildren(maxChildren).timeout(
       childSearchTimeout,
       onTimeout: () {
         logger.d(
             'The child search has finished with ${_children.length} child nodes.');
       },
     );
+    logger.i(
+        'Child search has finished. ${_children.length} child nodes are attached.');
 
     var workers = <Future<dynamic>>[];
 
@@ -125,30 +124,36 @@ class DartminatorNode extends NodeServiceBase {
     mainData['port'] = mainPort.sendPort;
     mainData['computation'] = _computation;
 
-    mainPort.listen((data) async {
-      final ReceivePort receiver = data;
-      String argument = arguments[0];
+    mainPort.listen((data) {
+      Map<String, dynamic> response = data;
+      SendPort isolatePort = response['port'];
+      String? argument = response['argument'];
+      String? result = response['result'];
 
-      await for (final message in receiver) {
-        if (message == null) {
-          break;
-        }
-
-        if (message is String) {
-          arguments.remove(argument);
-          results.add(message);
-
-          if (arguments.isNotEmpty) {
-            argument = arguments[0];
-            mainPort.sendPort.send(argument);
-          }
-        }
+      // Register valid result
+      if (result != null) {
+        results.add(result);
+        logger.i(
+            'New result from the main computation. ${(initialArguments.length - results.length) + 1} chunks remaining.');
+      } else if (argument != null) {
+        // Re-add failed argument
+        arguments.add(argument);
       }
 
-      mainPort.close();
+      // Send new argument, if any are available
+      if (arguments.isNotEmpty) {
+        String argument = arguments.removeAt(0);
+        isolatePort.send(argument);
+      } else {
+        // Close the port if no more work is available
+        isolatePort.send(null);
+        mainPort.close();
+      }
     }, onDone: () => mainCompleter.complete());
     workers.add(mainCompleter.future);
+    await Isolate.spawn(handleMainComputation, mainData);
 
+    List<Map<String, dynamic>> childData = [];
     for (var child in _children) {
       var childCompleter = Completer();
       var port = ReceivePort();
@@ -156,31 +161,46 @@ class DartminatorNode extends NodeServiceBase {
       Map<String, dynamic> data = {};
       data['port'] = port.sendPort;
       data['child'] = child;
-      arguments.removeAt(0);
-      port.listen((data) async {
-        final ReceivePort receiver = data;
-        String argument = arguments[0];
 
-        await for (final message in receiver) {
-          if (message == null) {
-            break;
+      port.listen((data) {
+        Map<String, dynamic> response = data;
+        SendPort? isolatePort = response['port'];
+        String? argument = response['argument'];
+        String? result = response['result'];
+
+        // If port is null, the child node is not reachable.
+        if (isolatePort == null) {
+          port.close();
+        } else {
+          // Register valid result
+          if (result != null) {
+            results.add(result);
+            logger.i(
+                'New result from a child computation. ${(initialArguments.length - results.length) + 1} chunks remaining.');
+          } else if (argument != null) {
+            // Re-add failed argument
+            arguments.add(argument);
           }
 
-          if (message is String) {
-            arguments.remove(argument);
-            results.add(message);
-
-            if (arguments.isNotEmpty) {
-              argument = arguments[0];
-              port.sendPort.send(argument);
-            }
+          // Send new argument, if any are available
+          if (arguments.isNotEmpty) {
+            String argument = arguments.removeAt(0);
+            isolatePort.send(argument);
+          } else {
+            _children.remove(child);
+            // Close the port if no more work is available
+            isolatePort.send(null);
+            port.close();
           }
         }
-
-        port.close();
       }, onDone: () => childCompleter.complete());
-
       workers.add(childCompleter.future);
+      childData.add(data);
+    }
+
+    // Spawning isolates in a separate loop since they modify the length of _children
+    for (var data in childData) {
+      await Isolate.spawn(handleChildComputation, data);
     }
 
     await Future.wait(workers);
@@ -269,10 +289,8 @@ class DartminatorNode extends NodeServiceBase {
 
           if (response != null) {
             var responseType = utf8.decode(response.data).split('-')[1];
-            var computationType = utf8.decode(response.data).split('-').last;
 
-            if (responseType == 'Name' &&
-                computationType == _computation.name) {
+            if (responseType == 'Name') {
               var responderName = utf8.decode(response.data).split('-')[2];
 
               logger.d(
@@ -284,7 +302,7 @@ class DartminatorNode extends NodeServiceBase {
               if (responderName != name &&
                   !_children.contains(response.address) &&
                   _children.length < maxChildren) {
-                logger.d(
+                logger.i(
                     'Adding $responderName at ${response.address} to children!');
 
                 _children.add(response.address);
@@ -344,7 +362,9 @@ class DartminatorNode extends NodeServiceBase {
                   .split('-')[3]
                   .split('Computation')[1];
 
-              if (inviter != name && computation == _computation.name) {
+              if (inviter != name &&
+                  computation == _computation.name &&
+                  !_isComputing) {
                 logger.d(
                     'Found a new potential computation from $inviter at ${response.address}.');
 
@@ -388,13 +408,15 @@ class DartminatorNode extends NodeServiceBase {
     // to closure and memory of the parent Isolate.
     var logger = getLogger();
 
-    ReceivePort port = data['port'];
-    var isolatePort = ReceivePort();
-    port.sendPort.send(isolatePort.sendPort);
+    SendPort responsePort = data['port'];
+
+    ReceivePort port = ReceivePort();
+    responsePort
+        .send({'argument': null, 'result': null, 'port': port.sendPort});
+
+    logger.d('Started child handler for ${data['child']}.');
 
     try {
-      logger.d('Started child handler for ${data['child']}.');
-
       // Creates the gRPC channel on the port 50051 with no credentials
       ClientChannel clientChannel = ClientChannel(data['child'],
           port: grpcPort,
@@ -407,36 +429,50 @@ class DartminatorNode extends NodeServiceBase {
           options: CallOptions(timeout: grpcCallTimeout));
 
       await for (var argument in port) {
-        String? result;
-        var responses = child.initiate(ComputationArgument(argument: argument));
+        logger.i('Argument: $argument');
 
-        // Listens to the response stream from the child node
-        await for (var response in responses) {
-          logger.d('Response from child ${data['child']}: $response');
-
-          if (response.empty) {
-            logger.w('The child ${data['child']} is already in a computation!');
-            break;
-          }
-
-          if (response.result.done) {
-            logger.d(
-                'The child ${data['child']} has finished with ${response.result.result}.');
-
-            result = response.result.result;
-            break;
-          }
+        if (argument == null) {
+          break;
         }
 
-        // Shuts the gRPC channel gracefully.
-        await clientChannel.shutdown();
+        try {
+          var responses =
+              child.initiate(ComputationArgument(argument: argument));
 
-        port.sendPort.send(result);
+          // Listens to the response stream from the child node
+          await for (var response in responses) {
+            logger.d('Response from child ${data['child']}: $response');
+
+            if (response.empty) {
+              logger
+                  .w('The child ${data['child']} is already in a computation!');
+              break;
+            }
+
+            if (response.result.done) {
+              logger.d(
+                  'The child ${data['child']} has finished with ${response.result.result}.');
+
+              responsePort.send({
+                'argument': argument,
+                'result': response.result.result,
+                'port': port.sendPort
+              });
+            }
+          }
+        } catch (err, stacktrace) {
+          logger
+              .e('The connection with a child has failed!\n$err\n$stacktrace');
+          responsePort.send(
+              {'argument': argument, 'result': null, 'port': port.sendPort});
+        }
       }
+
+      // Shuts the gRPC channel gracefully.
+      await clientChannel.shutdown();
     } catch (err, stacktrace) {
       logger.e('The connection with a child has failed!\n$err\n$stacktrace');
-
-      port.sendPort.send(null);
+      responsePort.send({'argument': null, 'result': null, 'port': null});
     }
   }
 
@@ -454,12 +490,18 @@ class DartminatorNode extends NodeServiceBase {
     // to closure and memory of the parent Isolate.
     var logger = getLogger();
 
-    ReceivePort port = data['port'];
+    SendPort responsePort = data['port'];
     Computation computation = data['computation'];
-    var isolatePort = ReceivePort();
-    port.sendPort.send(isolatePort.sendPort);
+
+    ReceivePort port = ReceivePort();
+    responsePort
+        .send({'argument': null, 'result': null, 'port': port.sendPort});
 
     await for (var argument in port) {
+      if (argument == null) {
+        break;
+      }
+
       try {
         logger.d('Starting main node computation from the argument $argument.');
 
@@ -468,21 +510,25 @@ class DartminatorNode extends NodeServiceBase {
         logger.d(
             'This node\'s computation has completed with the result $result.');
 
-        port.sendPort.send(result);
+        responsePort.send(
+            {'argument': argument, 'result': result, 'port': port.sendPort});
       } catch (err, stacktrace) {
         logger
             .e('The main computation has thrown an error!\n$err\n$stacktrace');
-
-        port.sendPort.send(null);
+        responsePort.send(
+            {'argument': argument, 'result': null, 'port': port.sendPort});
       }
     }
+
+    responsePort.send({'argument': null, 'result': null, 'port': null});
+    port.close();
   }
 
   /// Implements the gRPC function for communication between nodes.
   @override
   Stream<ComputationHeartbeat> initiate(
       ServiceCall call, ComputationArgument request) async* {
-    logger.d('Heartbeat request: $request');
+    logger.i('Heartbeat request: $request');
 
     // The node is already working. Returns an empty response.
     if (_isComputing) {
@@ -493,31 +539,31 @@ class DartminatorNode extends NodeServiceBase {
     }
 
     logger.i('Starting the computation as a child.');
-    String? result;
+    List<String> results = [];
     _currentArgument = request.argument;
-    compute(_computation.getArguments(request.argument)).then((results) async {
-      result = await _computation.finalizeResult(results);
-    });
+    compute(_computation.getArguments(request.argument))
+        .then((res) => results = res);
 
     // Returns a heartbeat until the computation is finished.
     // The delay between heartbeats is set by calculationTimeout.
-    while (result == null) {
+    while (results.isEmpty) {
       logger.i(
           'Still computing. Returning an empty heartbeat and waiting for $heartbeatTimeout.');
 
       var response = await Future.delayed(heartbeatTimeout,
           () => ComputationHeartbeat(result: ComputationResult(done: false)));
+
+      if (results.isEmpty) {
+        break;
+      }
+
       yield response;
     }
 
-    logger.i('Finished computation.');
+    String result = await _computation.finalizeResult(results);
 
-    // Check if the parent is still responding
-    if (call.isCanceled || call.isTimedOut) {
-      logger.i('Parent has stopped responding. Saving the stranded result.');
-      _strandedResult = result;
-      yield ComputationHeartbeat(result: ComputationResult(done: false));
-    }
+    logger.i('Finished computation. Returning result to the parent.');
+    _strandedResult = result;
 
     // The computation has finished. Returning the result.
     yield ComputationHeartbeat(
